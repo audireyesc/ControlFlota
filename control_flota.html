@@ -91,6 +91,7 @@
   .entry-mid{flex:1;min-width:0;}
   .entry-plate{font-size:13.5px;font-weight:600;font-family:"SF Mono",ui-monospace,monospace;letter-spacing:0.02em;}
   .entry-sub{font-size:12px;color:var(--ink-faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .entry-notes{font-size:11.5px;color:var(--ink-soft);margin-top:3px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .entry-right{text-align:right;flex-shrink:0;}
   .entry-amt{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;}
   .entry-date{font-size:11px;color:var(--ink-faint);margin-top:1px;}
@@ -266,7 +267,8 @@
         person: r.persona,
         amount: Number(r.monto),
         date: r.fecha instanceof Date ? r.fecha.toISOString().slice(0,10) : String(r.fecha).slice(0,10),
-        created: r.creado ? Number(r.creado) : 0
+        created: r.creado ? Number(r.creado) : 0,
+        notes: r.observaciones || ''
       };
     });
   }
@@ -424,6 +426,7 @@
         '<div class="field"><label for="f-plate">Placa</label><select id="f-plate">' + plateOpts + '</select></div>' +
         '<div class="field"><label for="f-person">Persona</label><select id="f-person">' + personOpts + '</select></div>' +
         '<div class="field"><label for="f-amount">Monto</label><div class="amount-wrap"><span>$</span><input type="number" id="f-amount" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></div></div>' +
+        '<div class="field"><label for="f-notes">Observaciones</label><input type="text" id="f-notes" placeholder="Ej. cambio de aceite, peaje autopista..."></div>' +
 
         '<button class="submit-btn" id="submit-btn">Guardar registro</button>' +
       '</div>' +
@@ -446,6 +449,8 @@
       var personSel = document.getElementById('f-person');
       var amountInput = document.getElementById('f-amount');
       var amount = parseFloat(amountInput.value);
+      var notesInput = document.getElementById('f-notes');
+      var notes = notesInput.value.trim();
       var btn = document.getElementById('submit-btn');
 
       var valid = true;
@@ -455,8 +460,10 @@
       });
       amountInput.classList.remove('field-empty');
       if(!amount || amount <= 0){ amountInput.classList.add('field-empty'); valid = false; }
+      notesInput.classList.remove('field-empty');
+      if(!notes){ notesInput.classList.add('field-empty'); valid = false; }
 
-      if(!valid){ showToast('Completa placa, persona y monto'); return; }
+      if(!valid){ showToast('Completa placa, persona, monto y observaciones'); return; }
 
       var newEntry = {
         id: uid(),
@@ -465,15 +472,17 @@
         person: personSel.value,
         amount: amount,
         date: todayISO(),
-        created: Date.now()
+        created: Date.now(),
+        notes: notes
       };
 
       btn.disabled = true;
       btn.textContent = 'Guardando…';
       try{
-        await apiPost({ action: 'addEntry', id: newEntry.id, category: newEntry.category, plate: newEntry.plate, person: newEntry.person, amount: newEntry.amount, date: newEntry.date, created: newEntry.created });
+        await apiPost({ action: 'addEntry', id: newEntry.id, category: newEntry.category, plate: newEntry.plate, person: newEntry.person, amount: newEntry.amount, date: newEntry.date, created: newEntry.created, notes: newEntry.notes });
         STATE.entries.push(newEntry);
         amountInput.value = '';
+        notesInput.value = '';
         showToast(CAT_LABEL[FORM.category] + ' guardado');
       }catch(err){
         showToast('No se pudo guardar, revisa tu conexión');
@@ -545,9 +554,10 @@
       return '<div class="placeholder">' + icon(CAT_ICON[cat]) + '<p>Sin registros de ' + CAT_LABEL[cat].toLowerCase() + ' todavía</p></div>';
     }
     return items.map(function(e){
+      var notesHTML = e.notes ? '<div class="entry-notes">' + esc(e.notes) + '</div>' : '';
       return '<div class="entry">' +
         '<div class="entry-avatar ' + e.category + '">' + esc(initials(e.person)) + '</div>' +
-        '<div class="entry-mid"><div class="entry-plate">' + esc(e.plate) + '</div><div class="entry-sub">' + esc(e.person) + '</div></div>' +
+        '<div class="entry-mid"><div class="entry-plate">' + esc(e.plate) + '</div><div class="entry-sub">' + esc(e.person) + '</div>' + notesHTML + '</div>' +
         '<div class="entry-right"><div class="entry-amt">' + money(e.amount) + '</div><div class="entry-date">' + fmtDate(e.date) + '</div></div>' +
         '<button class="entry-del" data-id="' + e.id + '" aria-label="Eliminar registro">' + icon('trash') + '</button>' +
       '</div>';
